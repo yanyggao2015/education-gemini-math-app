@@ -25,6 +25,7 @@ api_key = os.getenv("GEMINI_API_KEY")
 has_api_key = bool(api_key)
 
 client = genai.Client(api_key=api_key) if has_api_key else None
+MODEL_NAME = "gemini-3-flash-preview"
 
 # ----------------------------
 # Sidebar settings
@@ -43,19 +44,8 @@ difficulty = st.sidebar.selectbox(
     index=1
 )
 
-model_name = st.sidebar.selectbox(
-    "Model",
-    [
-        "gemini-3-flash-preview",
-        "gemini-3.1-flash-lite-preview",
-        "gemini-3.1-pro-preview"
-    ],
-    index=0
-)
-
-# Optional soft note in sidebar, no error UI
 if not has_api_key:
-    st.sidebar.caption("Gemini is not connected yet. You can still browse the app interface.")
+    
 
 # ----------------------------
 # Main input
@@ -80,7 +70,7 @@ generate_quiz = col2.button(
 )
 
 if not has_api_key:
-    st.caption("Connect a Gemini API key to enable content generation.")
+    st.caption("Connect an API key to enable content generation.")
 
 # ----------------------------
 # Prompt builders
@@ -196,12 +186,12 @@ Use this exact schema:
 # ----------------------------
 # Gemini call helper
 # ----------------------------
-def call_gemini(prompt: str, model_name: str):
+def call_gemini(prompt: str):
     if not client:
         return None
 
     response = client.models.generate_content(
-        model=model_name,
+        model=MODEL_NAME,
         contents=prompt
     )
     text = response.text.strip()
@@ -225,7 +215,7 @@ if "feedback_results" not in st.session_state:
 if generate_package and has_api_key:
     try:
         with st.spinner("Generating study package..."):
-            data = call_gemini(build_study_prompt(topic, grade, difficulty), model_name)
+            data = call_gemini(build_study_prompt(topic, grade, difficulty))
             st.session_state.study_data = data
     except Exception:
         pass
@@ -236,7 +226,7 @@ if generate_package and has_api_key:
 if generate_quiz and has_api_key:
     try:
         with st.spinner("Generating quiz..."):
-            data = call_gemini(build_quiz_prompt(topic, grade, difficulty), model_name)
+            data = call_gemini(build_quiz_prompt(topic, grade, difficulty))
             st.session_state.quiz_data = data
             st.session_state.feedback_results = {}
     except Exception:
@@ -312,8 +302,7 @@ if quiz_data:
                             expected_answer=q.get("expected_answer", ""),
                             student_answer=student_answer,
                             grade=grade
-                        ),
-                        model_name
+                        )
                     )
                     st.session_state.feedback_results[i] = feedback
             except Exception:
