@@ -44,7 +44,7 @@ difficulty = st.sidebar.selectbox(
     index=1
 )
 
-if not has_api_key:
+
     
 
 # ----------------------------
