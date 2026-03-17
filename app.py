@@ -19,16 +19,12 @@ st.title("📘 Education Topic Helper")
 st.caption("Generate explanations, key points, quiz questions, and feedback with Gemini.")
 
 # ----------------------------
-# API key check
+# API key / client setup
 # ----------------------------
 api_key = os.getenv("GEMINI_API_KEY")
+has_api_key = bool(api_key)
 
-if not api_key:
-    st.error("Missing GEMINI_API_KEY. Put it in your .env file first.")
-    st.stop()
-
-# Official pattern uses genai.Client(...)
-client = genai.Client(api_key=api_key)
+client = genai.Client(api_key=api_key) if has_api_key else None
 
 # ----------------------------
 # Sidebar settings
@@ -57,6 +53,10 @@ model_name = st.sidebar.selectbox(
     index=0
 )
 
+# Optional soft note in sidebar, no error UI
+if not has_api_key:
+    st.sidebar.caption("Gemini is not connected yet. You can still browse the app interface.")
+
 # ----------------------------
 # Main input
 # ----------------------------
@@ -67,8 +67,20 @@ topic = st.text_input(
 
 col1, col2 = st.columns(2)
 
-generate_package = col1.button("Generate Study Package", use_container_width=True)
-generate_quiz = col2.button("Generate Quiz Only", use_container_width=True)
+generate_package = col1.button(
+    "Generate Study Package",
+    use_container_width=True,
+    disabled=not has_api_key
+)
+
+generate_quiz = col2.button(
+    "Generate Quiz Only",
+    use_container_width=True,
+    disabled=not has_api_key
+)
+
+if not has_api_key:
+    st.caption("Connect a Gemini API key to enable content generation.")
 
 # ----------------------------
 # Prompt builders
@@ -185,6 +197,9 @@ Use this exact schema:
 # Gemini call helper
 # ----------------------------
 def call_gemini(prompt: str, model_name: str):
+    if not client:
+        return None
+
     response = client.models.generate_content(
         model=model_name,
         contents=prompt
@@ -207,25 +222,25 @@ if "feedback_results" not in st.session_state:
 # ----------------------------
 # Generate study package
 # ----------------------------
-if generate_package:
+if generate_package and has_api_key:
     try:
         with st.spinner("Generating study package..."):
             data = call_gemini(build_study_prompt(topic, grade, difficulty), model_name)
             st.session_state.study_data = data
-    except Exception as e:
-        st.error(f"Failed to generate study package: {e}")
+    except Exception:
+        pass
 
 # ----------------------------
 # Generate quiz
 # ----------------------------
-if generate_quiz:
+if generate_quiz and has_api_key:
     try:
         with st.spinner("Generating quiz..."):
             data = call_gemini(build_quiz_prompt(topic, grade, difficulty), model_name)
             st.session_state.quiz_data = data
             st.session_state.feedback_results = {}
-    except Exception as e:
-        st.error(f"Failed to generate quiz: {e}")
+    except Exception:
+        pass
 
 # ----------------------------
 # Render study package
@@ -281,7 +296,13 @@ if quiz_data:
             height=100
         )
 
-        if st.button(f"Check Question {i+1}", key=button_key):
+        check_clicked = st.button(
+            f"Check Question {i+1}",
+            key=button_key,
+            disabled=not has_api_key
+        )
+
+        if check_clicked and has_api_key:
             try:
                 with st.spinner(f"Checking Question {i+1}..."):
                     feedback = call_gemini(
@@ -295,8 +316,8 @@ if quiz_data:
                         model_name
                     )
                     st.session_state.feedback_results[i] = feedback
-            except Exception as e:
-                st.error(f"Failed to check answer: {e}")
+            except Exception:
+                pass
 
         if i in st.session_state.feedback_results:
             fb = st.session_state.feedback_results[i]
